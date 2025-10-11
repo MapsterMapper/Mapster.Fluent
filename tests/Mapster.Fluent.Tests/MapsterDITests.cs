@@ -99,14 +99,14 @@ namespace Mapster.Fluent.Tests
             var provider = services.BuildServiceProvider();
 
             // Act
-            TypeAdapterConfig config1, config2;
+            ITypeAdapterConfig config1, config2;
             using (var scope1 = provider.CreateScope())
             {
-                config1 = scope1.ServiceProvider.GetRequiredService<TypeAdapterConfig>();
+                config1 = scope1.ServiceProvider.GetRequiredService<ITypeAdapterConfig>();
             }
             using (var scope2 = provider.CreateScope())
             {
-                config2 = scope2.ServiceProvider.GetRequiredService<TypeAdapterConfig>();
+                config2 = scope2.ServiceProvider.GetRequiredService<ITypeAdapterConfig>();
             }
 
             // Assert
@@ -253,7 +253,7 @@ namespace Mapster.Fluent.Tests
 
             var provider = services.BuildServiceProvider();
             var mapper = provider.GetRequiredService<IMapper>();
-            var config = provider.GetRequiredService<TypeAdapterConfig>();
+            var config = provider.GetRequiredService<ITypeAdapterConfig>();
 
             // Assert
             mapper.ShouldNotBeNull();
@@ -338,7 +338,7 @@ namespace Mapster.Fluent.Tests
         }
 
         // ===== ADD MAPSTER WITH CONFIG TESTS =====
-
+        [Ignore("To prevent modification, access to TypeAdapterConfig should not be granted.")]
         [TestMethod]
         public void AddMapsterWithConfig_WithValidConfig_RegistersMapperAndConfig()
         {
@@ -353,7 +353,7 @@ namespace Mapster.Fluent.Tests
             services.AddMapsterWithConfig(existingConfig);
             var provider = services.BuildServiceProvider();
             var mapper = provider.GetRequiredService<IMapper>();
-            var config = provider.GetRequiredService<TypeAdapterConfig>();
+            var config = provider.GetRequiredService<ITypeAdapterConfig>();
 
             // Assert
             mapper.ShouldNotBeNull();
@@ -385,7 +385,7 @@ namespace Mapster.Fluent.Tests
             // Act & Assert
             Should.Throw<ArgumentNullException>(() => services.AddMapsterWithConfig(null));
         }
-
+        [Ignore("To prevent modification, access to TypeAdapterConfig should not be granted.")]
         [TestMethod]
         public void AddMapsterWithConfig_RegistersTypeAdapterConfigAsSingleton()
         {
@@ -396,14 +396,14 @@ namespace Mapster.Fluent.Tests
             var provider = services.BuildServiceProvider();
 
             // Act
-            TypeAdapterConfig config1, config2;
+            ITypeAdapterConfig config1, config2;
             using (var scope1 = provider.CreateScope())
             {
-                config1 = scope1.ServiceProvider.GetRequiredService<TypeAdapterConfig>();
+                config1 = scope1.ServiceProvider.GetRequiredService<ITypeAdapterConfig>();
             }
             using (var scope2 = provider.CreateScope())
             {
-                config2 = scope2.ServiceProvider.GetRequiredService<TypeAdapterConfig>();
+                config2 = scope2.ServiceProvider.GetRequiredService<ITypeAdapterConfig>();
             }
 
             // Assert
@@ -513,6 +513,59 @@ namespace Mapster.Fluent.Tests
             // Assert
             mapper.ShouldBeOfType<ServiceMapper>();
         }
+
+        [TestMethod]
+        public void FrozenConfigIsWork()
+        {
+            // Arrange
+            var services = new ServiceCollection();
+
+            // Act
+            services.AddMapsterFluent(
+                config =>
+                {
+                    config.NewConfig<TestProduct, TestProductDto>()
+                        .Map(dest => dest.DisplayName, src => "Frozen DisplayName");
+                    config.NewConfig<TestUser, TestUserDto>()
+                        .Map(dest => dest.FullName, src => "Frozen FullName")
+                        .Ignore(dest => dest.Id);
+
+                    config.FrozenTypes<TestProduct, TestProductDto>();
+                    config.FrozenTypes<TestUser, TestUserDto>();
+
+                    config.NewConfig<TestUser, TestUserDto>()
+                        .Map(dest => dest.FullName, src => $"{src.LastName} {src.FirstName}")
+                        .Ignore(dest => dest.Id);
+
+                    config.NewConfig<TestProduct, TestProductDto>()
+                        .Map(dest => dest.DisplayName, src => $"Product: {src.Name}");
+
+                },
+                options =>
+                {
+                    options.AssembliesToScan = [Assembly.GetExecutingAssembly()];
+                    options.UseServiceMapper = true;
+                });
+
+            var provider = services.BuildServiceProvider();
+
+            // Assert
+            using var scope = provider.CreateScope();
+            var mapper = scope.ServiceProvider.GetRequiredService<IMapper>();
+
+            // Test scanned mapping (from IRegister)
+            var user = new TestUser { FirstName = "Integration", LastName = "Test" };
+            var userDto = mapper.Map<TestUserDto>(user);
+            userDto.FullName.ShouldBe("Frozen FullName");
+
+            // Test fluent configuration
+            var product = new TestProduct { Name = "Widget" };
+            var productDto = mapper.Map<TestProductDto>(product);
+            productDto.DisplayName.ShouldBe("Frozen DisplayName");
+
+            // Test ServiceMapper type
+            mapper.ShouldBeOfType<ServiceMapper>();
+        }
     }
 
 
@@ -545,7 +598,7 @@ namespace Mapster.Fluent.Tests
 
     public class TestUserMappingConfig : IRegister
     {
-        public void Register(TypeAdapterConfig config)
+        public void Register(ITypeAdapterConfig config)
         {
             config.NewConfig<TestUser, TestUserDto>()
                 .Map(dest => dest.FullName, src => $"{src.FirstName} {src.LastName}");
