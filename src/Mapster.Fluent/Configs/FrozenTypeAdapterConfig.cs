@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Mapster.Fluent.Configs
 {
@@ -22,6 +23,11 @@ namespace Mapster.Fluent.Configs
 
         public FrozenTypeAdapterConfig(ITypeAdapterConfig config) : base(config.Clone())
         {
+        }
+
+        private FrozenTypeAdapterConfig(ITypeAdapterConfig config, bool isTotalFrozen) : base(config)
+        {
+            IsTotalFrozen = isTotalFrozen;
         }
 
         public override ITypeAdapterConfig GlobalSettings => new FrozenTypeAdapterConfig();
@@ -126,6 +132,29 @@ namespace Mapster.Fluent.Configs
 
             Apply(registers);
             return registers;
+        }
+
+        public override ITypeAdapterConfig Clone()
+        {
+            var result = new FrozenTypeAdapterConfig(base.Clone(), IsTotalFrozen);
+
+            if (IsTotalFrozen)
+                result.DeepFreeze();
+
+            else if(_frozentypes.Any())
+            {
+                foreach(var type in _frozentypes)
+                {
+                    result.FrozenTypes(type.Key);
+                }
+            }
+
+            return result;
+        }
+
+        public override ITypeAdapterConfig Fork(Action<ITypeAdapterConfig> action, [CallerFilePath] string key1 = "", [CallerLineNumber] int key2 = 0)
+        {
+            return base.Fork(action, key1, key2);
         }
     }
 }

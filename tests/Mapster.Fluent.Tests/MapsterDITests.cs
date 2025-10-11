@@ -1,4 +1,5 @@
-﻿using MapsterMapper;
+﻿using Mapster.Fluent.Configs;
+using MapsterMapper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shouldly;
