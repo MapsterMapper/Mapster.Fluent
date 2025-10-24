@@ -1,10 +1,8 @@
 ﻿using Mapster.Models;
-using Mapster.Utils;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Mapster.Fluent.Configs
@@ -17,20 +15,20 @@ namespace Mapster.Fluent.Configs
 
         public bool IsTotalFrozen { get; private set; }
 
-        public FrozenTypeAdapterConfig() : this(new TypeAdapterConfig())
-        {
-        }
+       
 
-        public FrozenTypeAdapterConfig(ITypeAdapterConfig config) : base(config.Clone())
-        {
-        }
-
-        private FrozenTypeAdapterConfig(ITypeAdapterConfig config, bool isTotalFrozen) : base(config)
+        private FrozenTypeAdapterConfig(ITypeAdapterConfig config, bool isTotalFrozen, bool IsGlobal = false ) 
         {
             IsTotalFrozen = isTotalFrozen;
         }
 
-        public override ITypeAdapterConfig GlobalSettings => new FrozenTypeAdapterConfig();
+        public FrozenTypeAdapterConfig(bool IsGlobal = false) : base(IsGlobal)
+        {
+        }
+
+        public FrozenTypeAdapterConfig(ITypeAdapterConfig config, bool IsGlobal = false) : base(config, IsGlobal)
+        {
+        }
 
         public override TypeAdapterSetter ForType(Type sourceType, Type destinationType)
         {
@@ -44,30 +42,7 @@ namespace Mapster.Fluent.Configs
             return base.ForType(sourceType, destinationType);
         }
 
-        public override TypeAdapterSetter NewConfig(Type sourceType, Type destinationType)
-        {
-            if (IsTotalFrozen ||
-                _frozentypes.TryGetValue(new TypeTuple(sourceType, destinationType), out _))
-            {
-                _dummyConfig.Clear();
-                return new TypeAdapterSetter(new TypeAdapterSettings(), _dummyConfig);
-            }
-
-            return base.NewConfig(sourceType, destinationType);
-        }
-
-        public override TypeAdapterSetter<TSource, TDestination> NewConfig<TSource, TDestination>()
-        {
-            if (IsTotalFrozen ||
-                _frozentypes.TryGetValue(new TypeTuple(typeof(TSource), typeof(TDestination)), out _))
-            {
-                _dummyConfig.Clear();
-                return _dummyConfig.NewConfig<TSource, TDestination>(); ;
-            }
-
-            return base.NewConfig<TSource, TDestination>();
-        }
-
+      
         public void FrozenTypes(Type sourceType, Type destinationType)
         {
             var types = new TypeTuple(sourceType, destinationType);
@@ -101,38 +76,7 @@ namespace Mapster.Fluent.Configs
             IsTotalFrozen = true;
         }
 
-        public override void Apply(IEnumerable<IRegister> registers)
-        {
-            foreach (IRegister register in registers)
-            {
-                register.Register(this);
-            }
-        }
-
-       
-        public override void Apply(params IRegister[] registers)
-        {
-            foreach (IRegister register in registers)
-            {
-                register.Register(this);
-            }
-        }
-
-        public override void Apply(IEnumerable<Lazy<IRegister>> registers)
-        {
-            base.Apply(registers);
-        }
-
-        public override IList<IRegister> Scan(params Assembly[] assemblies)
-        {
-            List<IRegister> registers = assemblies.Select(assembly => assembly.GetLoadableTypes()
-                .Where(x => typeof(IRegister).GetTypeInfo().IsAssignableFrom(x.GetTypeInfo()) && x.GetTypeInfo().IsClass && !x.GetTypeInfo().IsAbstract))
-                .SelectMany(registerTypes =>
-                    registerTypes.Select(registerType => (IRegister)Activator.CreateInstance(registerType))).ToList();
-
-            Apply(registers);
-            return registers;
-        }
+      
 
         public override ITypeAdapterConfig Clone()
         {
@@ -155,6 +99,22 @@ namespace Mapster.Fluent.Configs
         public override ITypeAdapterConfig Fork(Action<ITypeAdapterConfig> action, [CallerFilePath] string key1 = "", [CallerLineNumber] int key2 = 0)
         {
             return base.Fork(action, key1, key2);
+        }
+
+        public override void Apply(IEnumerable<IRegister> registers)
+        {
+            foreach (var item in registers)
+            {
+                item.Register(this);
+            }
+        }
+
+        public override void Remove(Type sourceType, Type destinationType)
+        {
+            if (IsTotalFrozen ||
+                _frozentypes.TryGetValue(new TypeTuple(sourceType, destinationType), out _)) ;
+            else
+                base.Remove(sourceType, destinationType);
         }
     }
 }
