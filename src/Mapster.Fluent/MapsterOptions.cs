@@ -20,6 +20,6 @@ namespace Mapster.Fluent
         /// </summary>
         public bool UseServiceMapper { get; set; } = true;
 
-        public Action<IFluentMapperConfig> ConfigureAction { get; set; }
+        public Action<ITypeAdapterConfig> ConfigureAction { get; set; }
     }
 }
